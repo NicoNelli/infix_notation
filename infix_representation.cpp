@@ -1,6 +1,7 @@
 #include <iostream>
 #include <stack> 
-#include <vector>        
+#include <vector>  
+#include <utility>        
 #include <map>        
 
 using namespace std;
@@ -8,9 +9,14 @@ using namespace std;
 class Node
 {
     public:
-        Node(char data = ' ', Node *left_child = NULL, Node *right_child = NULL) : _data(data), _left_child(left_child), _right_child(right_child) {}
+        Node(char data = ' ', Node *left_child = NULL, Node *right_child = NULL) : _data(data), _left_child(left_child), _right_child(right_child)
+        {
+            std::cout << "NODE CONSTRUCTOR" << std::endl;
+        }
         Node(const Node& node);
+        Node(Node&& node) noexcept;
         Node& operator=(const Node &n);
+        Node& operator=(Node&& node) noexcept;
         virtual ~Node();
         virtual void printInfo() {std::cout << "Node Class" << std::endl;}
         virtual int evaluate() {};
@@ -34,24 +40,60 @@ Node::Node(const Node& node)
     this->_right_child = new Node{' ',node.GetRightChild(),nullptr};
 }
 
+Node::Node(Node&& node) noexcept
+{
+    std::cout << "MOVE CONSTRUCTOR" << std::endl;
+    this->_data = node.GetData();
+    this->_left_child = node._left_child;
+    this->_right_child = node._right_child;
+
+    node._right_child = nullptr;
+    node._left_child = nullptr;
+}
+
+Node& Node::operator=(Node&& node) noexcept
+{
+    std::cout << "MOVE ASSIGNMENT OPERATOR " << std::endl;
+    if(&node != this)
+    {
+        if(this->_right_child != nullptr)
+        {
+            delete this->_right_child;
+        }
+        if(this->_left_child != nullptr)
+        {
+            delete this->_left_child ;
+        }
+    }
+    this->_data = node.GetData();
+    this->_left_child = node._left_child;
+    this->_right_child = node._right_child;
+
+    node._right_child = nullptr;
+    node._left_child = nullptr;
+
+    return *this;
+    
+}
+
 Node::~Node() 
 {
-    std::cout << "CALLING NODE BASE DESTRUCTOR WITH DATA: " << _data << std::endl;
+    std::cout << "CALLING NODE BASE DESTRUCTOR " << _data << std::endl;
     delete _left_child;
     delete _right_child;
 }
 
 Node& Node::operator=(const Node &n)
 {
-    std::cout << "ASSIGNMENT OPERATOR" << std::endl;
+    std::cout << " COPY ASSIGNMENT OPERATOR" << std::endl;
     // Check for self assignment
    if(this != &n)
    {
-       if(this->_right_child != NULL)
+       if(this->_right_child != nullptr)
        {
            delete this->_right_child;
        }
-        if(this->_left_child != NULL)
+        if(this->_left_child != nullptr)
        {
            delete this->_left_child ;
        }
@@ -133,7 +175,7 @@ class ParseTree
         }
        
         ~ParseTree();
-        void Parser(std::string sentence);
+        void Parser(const std::string& sentence);
         void printTree();
         int Evaluate();
     private:
@@ -181,26 +223,26 @@ int ParseTree::Evaluate()
     return root_node->evaluate();
 }
 
-void ParseTree::Parser(std::string sentence)
+void ParseTree::Parser(const std::string& sentence)
 {
-    for(unsigned int i = 0; i < sentence.size(); ++i)
+    for(const auto& current_char : sentence)
     {
-        std::cout << "current char of the sentence: " << sentence.at(i) << std::endl;
+        std::cout << "current char of the sentence: " << current_char << std::endl;
        
-        if(sentence.at(i) == '(')
+        if(current_char == '(')
         {
-            stack_of_chars.push(sentence.at(i));
+            stack_of_chars.push(current_char);
         }
-        else if (isdigit(sentence.at(i)))
+        else if (isdigit(current_char))
         {
-            stack_of_nodes.push(new Operand{sentence.at(i)});
+            stack_of_nodes.push(new Operand{current_char});
         }
-        else if(operators.count(sentence.at(i)))
+        else if(operators.count(current_char))
         {
-            auto current_char = operators.find(sentence.at(i));
+            auto mapped_char = operators.find(current_char);
             Node *tmp = nullptr;
-            while( !stack_of_chars.empty() && stack_of_chars.top() != '(' && ( sentence.at(i) != '^' && 
-                operators.at(stack_of_chars.top()) >= current_char->second) || (sentence.at(i) == '^' && operators.at(stack_of_chars.top()) > current_char->second) )
+            while( !stack_of_chars.empty() && stack_of_chars.top() != '(' && ( current_char != '^' && 
+                operators.at(stack_of_chars.top()) >= mapped_char->second) || (current_char == '^' && operators.at(stack_of_chars.top()) > mapped_char->second) )
             {
                 if(stack_of_chars.top() == '+')
                 {
@@ -216,13 +258,13 @@ void ParseTree::Parser(std::string sentence)
                 tmp->_right_child = stack_of_nodes.top();
                 stack_of_nodes.pop();
                 stack_of_nodes.push(std::move(tmp));
+                tmp = nullptr;
 
             }
-            tmp = nullptr;
 
-            stack_of_chars.push(sentence.at(i));
+            stack_of_chars.push(current_char);
         }
-        else if(sentence.at(i) == ')')
+        else if(current_char == ')')
         {
             Node *tmp = nullptr;
             while(stack_of_chars.top() != '(')
@@ -255,7 +297,7 @@ void ParseTree::Parser(std::string sentence)
 int main() {
 
     ParseTree tree_for_sentences{};
-    tree_for_sentences.Parser("(2*3)");
+    tree_for_sentences.Parser("(2*3 + 5)");
     tree_for_sentences.printTree();
     std::cout << "Result of the tree: " <<tree_for_sentences.Evaluate() << std::endl;
 
